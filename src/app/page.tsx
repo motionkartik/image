@@ -27,6 +27,7 @@ import {
 } from "@/lib/files";
 import BeforeAfterPreview from "@/components/BeforeAfterPreview";
 import FileInfoCard from "@/components/FileInfoCard";
+import ImageViewer from "@/components/ImageViewer";
 import { Sparkles, Shield, Zap, ImageIcon, ArrowDown, Settings, X, UploadCloud } from "lucide-react";
 
 interface SingleState {
@@ -37,6 +38,13 @@ interface SingleState {
   processedUrl: string | null;
   processedSize: number | null;
   processedDims: Dimensions | null;
+}
+
+interface ViewerState {
+  originalUrl: string;
+  processedUrl?: string;
+  originalLabel?: string;
+  processedLabel?: string;
 }
 
 const initialSingle: SingleState = {
@@ -66,6 +74,7 @@ export default function HomePage() {
   const [uploadKey, setUploadKey] = useState(0);
 
   const [dragDepth, setDragDepth] = useState(0);
+  const [viewer, setViewer] = useState<ViewerState | null>(null);
   const nextId = useRef(0);
 
   const populateSingle = useCallback(async (file: File) => {
@@ -158,6 +167,7 @@ export default function HomePage() {
     setHeight(0);
     setLockAspect(true);
     setUploadKey((k) => k + 1);
+    setViewer(null);
   }, [single, batchItems]);
 
   const handleBatchUpload = useCallback(
@@ -324,7 +334,33 @@ export default function HomePage() {
       if (it.processedUrl) URL.revokeObjectURL(it.processedUrl);
     });
     setBatchItems([]);
+    setViewer(null);
   }, [batchItems]);
+
+  const handleBatchPreview = useCallback((item: BatchItem) => {
+    setViewer({
+      originalUrl: item.originalUrl,
+      processedUrl: item.processedUrl,
+    });
+  }, []);
+
+  const removeBatchItem = useCallback(
+    (item: BatchItem) => {
+      setViewer((prev) =>
+        prev?.originalUrl === item.originalUrl ? null : prev,
+      );
+      const remaining = batchItems.filter((it) => it.id !== item.id);
+      URL.revokeObjectURL(item.originalUrl);
+      if (item.processedUrl) URL.revokeObjectURL(item.processedUrl);
+      setBatchItems(remaining);
+      if (remaining.length === 1) {
+        void populateSingle(remaining[0].file);
+      } else if (remaining.length === 0) {
+        setSingle(initialSingle);
+      }
+    },
+    [batchItems, populateSingle]
+  );
 
   const handleScale = useCallback(
     (scale: number) => {
@@ -474,13 +510,21 @@ export default function HomePage() {
                   Reset
                 </Button>
               </div>
-              {single.processedUrl && single.originalUrl ? (
+              {single.originalUrl ? (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <BeforeAfterPreview
                     originalUrl={single.originalUrl}
-                    processedUrl={single.processedUrl}
+                    processedUrl={single.processedUrl || undefined}
                     originalLabel={`Original · ${formatFileSize(single.file!.size)}`}
                     processedLabel={`Processed · ${single.processedSize ? formatFileSize(single.processedSize) : "—"}`}
+                    onExpand={() =>
+                      setViewer({
+                        originalUrl: single.originalUrl!,
+                        processedUrl: single.processedUrl || undefined,
+                        originalLabel: `Original · ${formatFileSize(single.file!.size)}`,
+                        processedLabel: `Processed · ${single.processedSize ? formatFileSize(single.processedSize) : "—"}`,
+                      })
+                    }
                   />
                 </div>
               ) : (
@@ -622,11 +666,23 @@ export default function HomePage() {
                 onDownloadOne={handleBatchDownloadOne}
                 onDownloadAll={handleBatchDownloadAll}
                 isProcessing={isBatchProcessing}
+                onPreview={handleBatchPreview}
+                onRemove={removeBatchItem}
               />
             </div>
           </div>
         )}
       </div>
+
+      {viewer && (
+        <ImageViewer
+          originalUrl={viewer.originalUrl}
+          processedUrl={viewer.processedUrl}
+          originalLabel={viewer.originalLabel}
+          processedLabel={viewer.processedLabel}
+          onClose={() => setViewer(null)}
+        />
+      )}
     </div>
   );
 }

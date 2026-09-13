@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { formatFileSize } from "@/lib/utils";
 import { getBasename, getDirname } from "@/lib/files";
-import { Download, Archive, CheckCircle2, Loader2, AlertCircle, Folder } from "lucide-react";
+import { Download, Archive, CheckCircle2, Loader2, AlertCircle, Folder, Maximize, X } from "lucide-react";
 
 export interface BatchItem {
   id: string;
@@ -24,6 +24,8 @@ interface BatchManagerProps {
   onDownloadOne: (item: BatchItem) => void;
   onDownloadAll: () => void;
   isProcessing: boolean;
+  onPreview: (item: BatchItem) => void;
+  onRemove: (item: BatchItem) => void;
 }
 
 export default function BatchManager({
@@ -31,6 +33,8 @@ export default function BatchManager({
   onDownloadOne,
   onDownloadAll,
   isProcessing,
+  onPreview,
+  onRemove,
 }: BatchManagerProps) {
   const doneCount = items.filter((i) => i.status === "done").length;
   const progress = items.length > 0 ? (doneCount / items.length) * 100 : 0;
@@ -63,6 +67,20 @@ export default function BatchManager({
                 alt={item.file.name}
                 className="w-full h-full object-cover transition-opacity duration-300"
               />
+              <button
+                onClick={() => onRemove(item)}
+                className="absolute top-1.5 left-1.5 z-20 flex items-center justify-center w-6 h-6 rounded-full bg-background/80 hover:bg-red-500/90 text-foreground hover:text-white backdrop-blur-sm shadow transition-colors active:scale-90"
+                title="Remove image"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => onPreview(item)}
+                className="absolute bottom-1.5 right-1.5 z-20 flex items-center justify-center w-6 h-6 rounded-full bg-background/80 hover:bg-muted text-foreground backdrop-blur-sm shadow transition-colors active:scale-90"
+                title={item.status === "done" && item.processedUrl ? "View before/after fullscreen" : "View fullscreen"}
+              >
+                <Maximize className="w-3.5 h-3.5" />
+              </button>
               {item.status === "processing" && (
                 <div className="absolute inset-0 bg-background/70 backdrop-blur-[2px] flex items-center justify-center">
                   <Loader2 className="w-6 h-6 text-primary animate-spin" />
