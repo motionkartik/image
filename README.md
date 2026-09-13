@@ -20,7 +20,8 @@
 
 ## ✨ Features
 
-- **Drag & drop** upload — or click to browse
+- **Drag & drop anywhere** — drop images (or whole folders) anywhere on the page, or click to browse
+- **Folder support** — drop a folder and download a ZIP that preserves the subfolder structure
 - **Single mode** — before/after clip-path slider comparison
 - **Batch mode** — auto-detected when you upload multiple files
 - **Compress** with adjustable quality control (0–100)
@@ -31,7 +32,6 @@
 - **Download** individually or all at once as ZIP
 - **Dark mode** — with smooth transitions
 - **Mobile responsive**
-- **20 MB max** per file
 - **100% client-side** — nothing leaves your browser
 
 ## 🔒 Privacy First
@@ -69,11 +69,11 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 📦 How It Works
 
-1. You drop an image (or several) into the upload zone
-2. Minikyu reads it locally using `FileReader` and `createImageBitmap`
+1. You drop images (or whole folders) anywhere on the page
+2. Minikyu reads them locally using `FileReader` and `createImageBitmap`, keeping each file's relative path
 3. Compression runs through `browser-image-compression`
 4. Resizing and format conversion happen on an off-screen `<canvas>`
-5. The processed file is handed back to you as a download
+5. The processed files are handed back as downloads — the ZIP keeps your folder layout intact
 
 No fetch calls. No FormData. No server. Just your browser doing the work.
 

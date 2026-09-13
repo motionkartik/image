@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
-import { ACCEPTED_TYPES, ACCEPTED_EXTENSIONS, getFileExtension } from "@/lib/utils";
+import { ACCEPTED_EXTENSIONS } from "@/lib/utils";
+import { extractDroppedFiles, filterSupportedFiles, type DroppedFile } from "@/lib/files";
 import { Upload, FileCheck } from "lucide-react";
 
 interface UploadZoneProps {
   multiple?: boolean;
-  onFiles: (files: File[]) => void;
+  onFiles: (files: DroppedFile[]) => void;
 }
 
 export default function UploadZone({ multiple = false, onFiles }: UploadZoneProps) {
@@ -15,24 +15,12 @@ export default function UploadZone({ multiple = false, onFiles }: UploadZoneProp
   const [hasFiles, setHasFiles] = useState(false);
   const isOpen = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
 
   const validateAndEmit = useCallback(
-    (fileList: FileList | null) => {
-      if (!fileList || fileList.length === 0) return;
-      const valid: File[] = [];
-
-      for (const file of Array.from(fileList)) {
-        const ext = getFileExtension(file.name);
-        const acceptedExts = ACCEPTED_EXTENSIONS.split(",").map((e) => e.replace(".", ""));
-        const isTypeValid = ACCEPTED_TYPES.includes(file.type);
-        const isExtValid = ext ? acceptedExts.includes(ext) : false;
-        if (!isTypeValid && !isExtValid) {
-          toast.error(`"${file.name}" is not a supported format. Use JPEG, PNG, WebP, or AVIF.`);
-          continue;
-        }
-        valid.push(file);
-      }
-
+    (dropped: DroppedFile[]) => {
+      if (!dropped || dropped.length === 0) return;
+      const valid = filterSupportedFiles(dropped);
       if (valid.length > 0) {
         setHasFiles(true);
         onFiles(multiple ? valid : [valid[0]]);
@@ -42,10 +30,11 @@ export default function UploadZone({ multiple = false, onFiles }: UploadZoneProp
   );
 
   const handleDrop = useCallback(
-    (e: React.DragEvent) => {
+    async (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragging(false);
-      validateAndEmit(e.dataTransfer.files);
+      const dropped = await extractDroppedFiles(e.dataTransfer);
+      validateAndEmit(dropped);
     },
     [validateAndEmit]
   );
@@ -54,6 +43,13 @@ export default function UploadZone({ multiple = false, onFiles }: UploadZoneProp
     if (isOpen.current) return;
     isOpen.current = true;
     inputRef.current?.click();
+  }, []);
+
+  const handleFolderPick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isOpen.current) return;
+    isOpen.current = true;
+    folderRef.current?.click();
   }, []);
 
   useEffect(() => {
@@ -66,6 +62,7 @@ export default function UploadZone({ multiple = false, onFiles }: UploadZoneProp
 
   return (
     <div
+      data-dropzone
       onDragOver={(e) => {
         e.preventDefault();
         setIsDragging(true);
@@ -73,9 +70,6 @@ export default function UploadZone({ multiple = false, onFiles }: UploadZoneProp
       onDragLeave={() => setIsDragging(false)}
       onDrop={handleDrop}
       onClick={handleClick}
-      onChange={() => {
-        // handled by input's own onChange below
-      }}
       className={`
         relative flex flex-col items-center justify-center gap-3
         w-full min-h-[200px] rounded-2xl border-2 border-dashed
@@ -107,16 +101,24 @@ export default function UploadZone({ multiple = false, onFiles }: UploadZoneProp
           </div>
           <div className="text-center px-4">
             <p className="text-sm font-medium text-foreground/70">
-              {isDragging ? "Drop your images here\u2026" : "Drag & drop images here"}
+              {isDragging ? "Drop your images here\u2026" : "Drag & drop images anywhere on the page"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               or{" "}
               <span className="text-primary font-medium underline underline-offset-2">
                 click to browse
+              </span>{" "}
+              or{" "}
+              <span
+                className="text-primary font-medium underline underline-offset-2"
+                onClick={handleFolderPick}
+              >
+                choose a folder
               </span>
             </p>
             <p className="text-[11px] text-muted-foreground/50 mt-2.5">
               JPEG, PNG, WebP, AVIF {multiple && "· Multiple files supported"}
+              {multiple && " · Folders keep their layout in the ZIP"}
             </p>
           </div>
         </>
@@ -130,7 +132,28 @@ export default function UploadZone({ multiple = false, onFiles }: UploadZoneProp
         className="hidden"
         onChange={(e) => {
           isOpen.current = false;
-          validateAndEmit(e.target.files);
+          const files = Array.from(e.target.files || []).map((file) => ({
+            file,
+            relativePath: file.name,
+          }));
+          validateAndEmit(files);
+          e.target.value = "";
+        }}
+      />
+      <input
+        ref={folderRef}
+        type="file"
+        accept={ACCEPTED_EXTENSIONS}
+        multiple
+        {...({ webkitdirectory: "true" } as Record<string, string>)}
+        className="hidden"
+        onChange={(e) => {
+          isOpen.current = false;
+          const files = Array.from(e.target.files || []).map((file) => ({
+            file,
+            relativePath: (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name,
+          }));
+          validateAndEmit(files);
           e.target.value = "";
         }}
       />

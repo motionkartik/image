@@ -4,7 +4,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { formatFileSize } from "@/lib/utils";
-import { Download, Archive, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
+import { getBasename, getDirname } from "@/lib/files";
+import { Download, Archive, CheckCircle2, Loader2, AlertCircle, Folder } from "lucide-react";
 
 export interface BatchItem {
   id: string;
@@ -14,6 +15,7 @@ export interface BatchItem {
   processedUrl?: string;
   processedSize?: number;
   processedName?: string;
+  relativePath?: string;
   status: "pending" | "processing" | "done" | "error";
 }
 
@@ -85,9 +87,18 @@ export default function BatchManager({
               )}
             </div>
             <div className="p-2.5 space-y-1.5">
-              <p className="text-xs font-medium truncate text-foreground/80" title={item.file.name}>
-                {item.file.name}
+              <p className="text-xs font-medium truncate text-foreground/80" title={item.relativePath || item.file.name}>
+                {getBasename(item.relativePath || item.file.name)}
               </p>
+              {item.relativePath && item.relativePath.includes("/") && (
+                <p
+                  className="flex items-center gap-1 text-[10px] text-muted-foreground truncate"
+                  title={getDirname(item.relativePath)}
+                >
+                  <Folder className="w-3 h-3 shrink-0" />
+                  <span className="truncate">{getDirname(item.relativePath)}</span>
+                </p>
+              )}
               <p className="text-[10px] text-muted-foreground">
                 {formatFileSize(item.file.size)}
                 {item.processedSize != null && (

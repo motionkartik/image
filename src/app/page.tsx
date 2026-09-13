@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
@@ -18,9 +18,16 @@ import {
 } from "@/lib/transform";
 import { downloadAsZip, downloadSingle } from "@/lib/zip";
 import { formatFileSize, stripExtension } from "@/lib/utils";
+import {
+  extractDroppedFiles,
+  filterSupportedFiles,
+  getBasename,
+  replaceExtension,
+  type DroppedFile,
+} from "@/lib/files";
 import BeforeAfterPreview from "@/components/BeforeAfterPreview";
 import FileInfoCard from "@/components/FileInfoCard";
-import { Sparkles, Shield, Zap, ImageIcon, ArrowDown, Settings, X } from "lucide-react";
+import { Sparkles, Shield, Zap, ImageIcon, ArrowDown, Settings, X, UploadCloud } from "lucide-react";
 
 interface SingleState {
   file: File | null;
@@ -58,6 +65,7 @@ export default function HomePage() {
   const [showSettings, setShowSettings] = useState(false);
   const [uploadKey, setUploadKey] = useState(0);
 
+  const [dragDepth, setDragDepth] = useState(0);
   const nextId = useRef(0);
 
   const populateSingle = useCallback(async (file: File) => {
@@ -153,11 +161,13 @@ export default function HomePage() {
   }, [single, batchItems]);
 
   const handleBatchUpload = useCallback(
-    async (files: File[]) => {
-      const newItems: BatchItem[] = files.map((f) => ({
+    async (dropped: DroppedFile[]) => {
+      const files = dropped.map((d) => d.file);
+      const newItems: BatchItem[] = dropped.map((d) => ({
         id: String(nextId.current++),
-        file: f,
-        originalUrl: URL.createObjectURL(f),
+        file: d.file,
+        originalUrl: URL.createObjectURL(d.file),
+        relativePath: d.relativePath,
         status: "pending" as const,
       }));
 
@@ -175,6 +185,54 @@ export default function HomePage() {
     },
     [batchItems.length, populateSingle],
   );
+
+  const handleGlobalDrop = useCallback(
+    async (e: DragEvent) => {
+      const dropped = filterSupportedFiles(await extractDroppedFiles(e.dataTransfer));
+      if (dropped.length > 0) {
+        await handleBatchUpload(dropped);
+      }
+    },
+    [handleBatchUpload]
+  );
+
+  useEffect(() => {
+    const hasFileDrag = (e: DragEvent): boolean => {
+      return Array.from((e.dataTransfer?.types || []) as ArrayLike<string>).includes("Files");
+    };
+
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+    };
+    const handleDragEnter = (e: DragEvent) => {
+      e.preventDefault();
+      if (hasFileDrag(e)) {
+        setDragDepth((d) => d + 1);
+      }
+    };
+    const handleDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      setDragDepth((d) => Math.max(0, d - 1));
+    };
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault();
+      setDragDepth(0);
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest("[data-dropzone]")) return;
+      void handleGlobalDrop(e);
+    };
+
+    window.addEventListener("dragover", handleDragOver);
+    window.addEventListener("dragenter", handleDragEnter);
+    window.addEventListener("dragleave", handleDragLeave);
+    window.addEventListener("drop", handleDrop);
+    return () => {
+      window.removeEventListener("dragover", handleDragOver);
+      window.removeEventListener("dragenter", handleDragEnter);
+      window.removeEventListener("dragleave", handleDragLeave);
+      window.removeEventListener("drop", handleDrop);
+    };
+  }, [handleGlobalDrop]);
 
   const processBatch = useCallback(async () => {
     setIsBatchProcessing(true);
@@ -213,8 +271,8 @@ export default function HomePage() {
         const finalFile = await convertFormat(transformedFile, format, quality);
         const finalUrl = URL.createObjectURL(finalFile);
 
-        const baseName = stripExtension(item.file.name);
         const ext = getExtension(format);
+        const processedName = replaceExtension(item.relativePath || item.file.name, ext);
 
         setBatchItems((prev) =>
           prev.map((it) =>
@@ -225,7 +283,7 @@ export default function HomePage() {
                   processedBlob: finalFile,
                   processedUrl: finalUrl,
                   processedSize: finalFile.size,
-                  processedName: `${baseName}${ext}`,
+                  processedName,
                 }
               : it,
           ),
@@ -245,7 +303,7 @@ export default function HomePage() {
 
   const handleBatchDownloadOne = useCallback((item: BatchItem) => {
     if (item.processedBlob && item.processedName) {
-      downloadSingle(item.processedBlob, item.processedName);
+      downloadSingle(item.processedBlob, getBasename(item.processedName));
     }
   }, []);
 
@@ -287,6 +345,23 @@ export default function HomePage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+      {dragDepth > 0 && (
+        <div className="fixed inset-0 z-[60] pointer-events-none flex items-center justify-center">
+          <div className="absolute inset-0 bg-background/70 backdrop-blur-md animate-in fade-in duration-150" />
+          <div className="relative text-center space-y-3 px-10 py-8 rounded-2xl border-2 border-dashed border-primary/50 bg-card/80 backdrop-blur-sm shadow-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 mx-auto flex items-center justify-center">
+              <UploadCloud className="w-8 h-8 text-primary" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold">Drop your images anywhere</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Folders keep their structure when you download the ZIP
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="text-center space-y-5 pt-6 pb-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight leading-tight">
           Compress, convert & transform
