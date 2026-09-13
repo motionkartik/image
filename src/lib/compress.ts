@@ -14,7 +14,6 @@ export async function compressImage(
   const originalSize = file.size;
 
   const options = {
-    maxSizeMB: 20,
     initialQuality: quality / 100,
     useWebWorker: true,
     preserveExif: false,

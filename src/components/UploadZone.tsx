@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { MAX_FILE_SIZE, ACCEPTED_TYPES, ACCEPTED_EXTENSIONS, formatFileSize, getFileExtension } from "@/lib/utils";
+import { ACCEPTED_TYPES, ACCEPTED_EXTENSIONS, getFileExtension } from "@/lib/utils";
 import { Upload, FileCheck } from "lucide-react";
 
 interface UploadZoneProps {
@@ -28,10 +28,6 @@ export default function UploadZone({ multiple = false, onFiles }: UploadZoneProp
         const isExtValid = ext ? acceptedExts.includes(ext) : false;
         if (!isTypeValid && !isExtValid) {
           toast.error(`"${file.name}" is not a supported format. Use JPEG, PNG, WebP, or AVIF.`);
-          continue;
-        }
-        if (file.size > MAX_FILE_SIZE) {
-          toast.error(`"${file.name}" exceeds 20 MB (${formatFileSize(file.size)}).`);
           continue;
         }
         valid.push(file);
@@ -120,7 +116,7 @@ export default function UploadZone({ multiple = false, onFiles }: UploadZoneProp
               </span>
             </p>
             <p className="text-[11px] text-muted-foreground/50 mt-2.5">
-              JPEG, PNG, WebP, AVIF &middot; Max 20 MB {multiple && "· Multiple files supported"}
+              JPEG, PNG, WebP, AVIF {multiple && "· Multiple files supported"}
             </p>
           </div>
         </>
